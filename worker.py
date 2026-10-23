@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import threading
 import sys
+from datetime import datetime
 import psutil
 import pystray
 from PIL import Image, ImageDraw
@@ -14,12 +15,36 @@ CONFIG_DIR = os.path.join(os.path.dirname(__file__), "CONFIG")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 LOG_FILE = os.path.join(CONFIG_DIR, "worker.log")
 
+class TimestampedLogWriter:
+    def __init__(self, stream):
+        self._stream = stream
+        self._lock = threading.Lock()
+        self._at_line_start = True
+
+    def write(self, text):
+        if not text:
+            return 0
+        with self._lock:
+            for line in text.splitlines(keepends=True):
+                if self._at_line_start:
+                    timestamp = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %z")
+                    self._stream.write(f"[{timestamp}] ")
+                self._stream.write(line)
+                self._at_line_start = line.endswith(("\n", "\r"))
+            self._stream.flush()
+        return len(text)
+
+    def flush(self):
+        with self._lock:
+            self._stream.flush()
+
 def configure_output():
     if sys.stdout is None or sys.stderr is None:
         os.makedirs(CONFIG_DIR, exist_ok=True)
         log_file = open(LOG_FILE, "a", encoding="utf-8", buffering=1)
-        sys.stdout = log_file
-        sys.stderr = log_file
+        log_writer = TimestampedLogWriter(log_file)
+        sys.stdout = log_writer
+        sys.stderr = log_writer
         return False
     return True
 
