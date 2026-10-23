@@ -229,6 +229,13 @@ def exit_worker(icon, item, controller):
     controller.stop()
     icon.stop()
 
+def open_log_file(icon, item):
+    try:
+        os.startfile(LOG_FILE)
+        log_event("INFO", "Opened the worker log file.")
+    except (AttributeError, OSError) as error:
+        log_event("ERROR", f"Could not open the worker log file: {error}")
+
 def main():
     configure_output()
     log_event("INFO", "Worker started.")
@@ -237,6 +244,7 @@ def main():
     controller = WorkerController()
     menu = pystray.Menu(
         pystray.MenuItem("Restart worker", controller.restart),
+        pystray.MenuItem("Open log file", open_log_file),
         pystray.MenuItem("Exit", lambda icon, item: exit_worker(icon, item, controller)),
     )
     icon = pystray.Icon("vpn_checker", create_tray_image(), "VPN Checker Worker", menu)
