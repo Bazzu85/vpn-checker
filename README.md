@@ -1,59 +1,74 @@
 # VPN Checker
 
-A small Windows utility that monitors a selected network interface and starts configured applications when they are not running while that interface is up.
+VPN Checker is a Windows utility that monitors a selected network interface and optionally starts or stops configured applications according to that interface's state. It includes both console and graphical configuration modes, plus a background worker managed from the system tray.
 
 ## Features
 
-- Select a network interface from those available on the system.
-- Add applications by entering an executable path or selecting from currently running processes.
-- Remove configured applications and update the configuration interactively.
-- Check the selected interface every 10 seconds, with optional automatic process start and stop.
+- Configure a network interface and a list of Windows executable paths.
+- Add applications by browsing to an `.exe` file or selecting currently running processes.
+- Choose whether the worker starts configured applications while the selected interface is up.
+- Choose whether the worker stops configured applications when the interface is down or missing.
+- Enable detailed, timestamped debug logging.
+- Manage the worker from the system tray: restart it, open its log, or exit.
 
 ## Requirements
 
 - Windows
 - Python 3
-- `psutil`
-- `pystray`
-- `Pillow`
+- Tkinter, included with most standard Windows Python installations
+- Packages listed in `requirements.txt`: `psutil`, `pystray`, and `Pillow`
 
-Install the dependencies from PowerShell in the project folder:
+Install the packages from PowerShell in the project directory:
 
 ```powershell
 python -m pip install -r requirements.txt
 ```
 
-## Usage
+## Configure
 
-1. Choose how to start the configurator:
+Choose one configuration interface:
 
-   ```powershell
-   python configurator.py
-   ```
+```powershell
+python configurator.py
+```
 
-   This opens the interactive console configurator. To use the graphical window without a console, double-click `configurator.pyw` or run:
+This starts the interactive console configurator. It can select the network interface, add or remove processes, toggle the automation and debug settings, save, or exit without saving.
 
-   ```powershell
-   pythonw configurator.py
-   ```
+To open the graphical configurator without a console, double-click `configurator.pyw` in File Explorer, or run:
 
-2. Select a network interface, add or remove applications, and configure automatic start, stop-on-disconnect, and debug logging. The GUI lets you browse for `.exe` files or select currently running processes; the console mode provides equivalent menu options.
+```powershell
+pythonw configurator.py
+```
 
-   For running processes whose executable path Windows does not expose, the configurator stores their process name instead.
+The GUI can browse for executable files or select one or more running processes. If Windows does not expose a selected process's executable path, its process name is saved instead. The **Save** button saves the configuration and leaves the GUI open; **Close without saving** exits without saving unsaved changes.
 
-3. Start the worker without a console window by double-clicking `worker.pyw` in File Explorer. You can also run it from PowerShell with `pythonw worker.py`:
+Both modes save to `CONFIG/config.json`.
 
-   ```powershell
-   pythonw worker.py
-   ```
+## Run the Worker
 
-   The worker runs in the system tray only, with **Restart worker** and **Exit** options. Its output is written to `CONFIG/worker.log`. For console output while debugging, run `python worker.py` instead.
+To start the worker in the system tray without a console, double-click `worker.pyw`, or run:
 
-The configurator saves settings to `CONFIG/config.json` when you click **Save**. Click **Close without saving** to discard changes. It uses Python's built-in Tkinter GUI toolkit and does not require additional dependencies.
+```powershell
+pythonw worker.py
+```
 
-## Configuration Format
+The tray menu provides:
 
-The configuration file contains the selected interface name, a list of executable paths or process names, and worker automation and logging settings:
+- **Restart worker**: restart the monitoring loop.
+- **Open log file**: open `CONFIG/worker.log` with the default Windows application.
+- **Exit**: stop the worker and remove its tray icon.
+
+For console output while debugging, run:
+
+```powershell
+python worker.py
+```
+
+The worker reloads `CONFIG/config.json` every 10 seconds. If the configuration file is missing, it checks again after 5 seconds.
+
+## Configuration
+
+The configuration is a JSON object with the selected interface, configured process paths or names, and three boolean settings:
 
 ```json
 {
@@ -62,15 +77,17 @@ The configuration file contains the selected interface name, a list of executabl
     "C:\\Program Files\\Example App\\example.exe"
   ],
   "auto_start_processes": false,
-   "stop_processes_on_disconnect": false,
-   "debug": false
+  "stop_processes_on_disconnect": false,
+  "debug": false
 }
 ```
 
-Use JSON-escaped backslashes in Windows paths, as shown above.
+Use escaped backslashes in Windows paths. All three settings default to `false`, including when they are absent from an older configuration.
 
-## Important Behavior
+## Worker Behavior
 
-Both automation options and debug logging are disabled by default, including for existing configuration files that do not yet contain these settings. When **automatic process start** is enabled, the worker starts configured applications that are not already running while the selected interface is up. When **stop processes on disconnect** is enabled, it stops all running instances of configured applications if the selected interface is down or missing. The worker checks the interface every 10 seconds. Enable **detailed worker debug logging** in the configurator to record each monitoring step with a `DEBUG` level; regular events use `INFO`, and warnings or errors retain their respective levels. Messages are written to `CONFIG/worker.log` and to standard output when a console is available.
+When **automatic process start** is enabled and the selected interface is up, the worker checks whether each configured process is already running. If not, it resolves and starts the executable. When the interface is down or missing, it logs the condition; if **stop processes on disconnect** is enabled, it attempts to terminate every running process whose executable name matches a configured process. Processes that do not exit within three seconds are force-stopped.
 
-This tool does not route application traffic through a VPN or verify that the VPN can reach the internet. Configure VPN routing and any required network protections separately.
+With **debug logging** enabled, the worker records details of each monitoring cycle. Routine events use the `INFO` level; warnings and errors use `WARNING` and `ERROR`. Every log line includes a local timestamp. Messages go to `CONFIG/worker.log` and also to standard output when a console is available. With the no-console `worker.pyw` launcher, messages are written to the log file.
+
+This utility only checks whether the selected network interface is up. It does not verify VPN connectivity, route application traffic through the VPN, or provide a network kill switch. Configure VPN routing and any required traffic protections separately.
