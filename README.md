@@ -25,10 +25,10 @@ python -m pip install -r requirements.txt
 
 ## Usage
 
-1. Run the configurator:
+1. Start the configurator without a console by double-clicking `configurator.pyw`. You can also run it from PowerShell with `pythonw configurator.py`:
 
    ```powershell
-   python configurator.py
+   pythonw configurator.py
    ```
 
 2. Use the configurator window to select a network interface, add or remove applications, and enable either automation option. Add applications by browsing to an `.exe` file or selecting one or more currently running processes.

@@ -205,7 +205,7 @@ def main():
     )
     ttk.Button(process_buttons, text="Remove selected", command=remove_selected_processes).pack(side="left")
 
-    def save_and_close():
+    def save_settings():
         selected_interface = interface_var.get()
         if not selected_interface:
             messagebox.showerror("Missing interface", "Select a network interface before saving.", parent=root)
@@ -224,12 +224,12 @@ def main():
         except OSError as error:
             messagebox.showerror("Save error", f"Could not save configuration: {error}", parent=root)
             return
-        root.destroy()
+        messagebox.showinfo("Settings saved", "Configuration saved successfully.", parent=root)
 
     footer = ttk.Frame(root, padding=12)
     footer.grid(row=3, column=0, sticky="ew")
     ttk.Button(footer, text="Close without saving", command=root.destroy).pack(side="right")
-    ttk.Button(footer, text="Save", command=save_and_close).pack(side="right", padx=(0, 8))
+    ttk.Button(footer, text="Save", command=save_settings).pack(side="right", padx=(0, 8))
 
     refresh_process_list()
     root.mainloop()
