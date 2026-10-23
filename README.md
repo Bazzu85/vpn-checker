@@ -31,13 +31,9 @@ python -m pip install -r requirements.txt
    python configurator.py
    ```
 
-2. Select a network interface and add the applications to monitor. For manual entry, provide the full path to an existing `.exe` file, for example:
+2. Use the configurator window to select a network interface, add or remove applications, and enable either automation option. Add applications by browsing to an `.exe` file or selecting one or more currently running processes.
 
-   ```text
-   C:\Program Files\Example App\example.exe
-   ```
-
-   The active-process list displays executable paths when Windows makes them available. If a process path is unavailable, the configurator stores its process name instead.
+   For running processes whose executable path Windows does not expose, the configurator stores their process name instead.
 
 3. Start the worker without a console window by double-clicking `worker.pyw` in File Explorer. You can also run it from PowerShell with `pythonw worker.py`:
 
@@ -47,7 +43,7 @@ python -m pip install -r requirements.txt
 
    The worker runs in the system tray only, with **Restart worker** and **Exit** options. Its output is written to `CONFIG/worker.log`. For console output while debugging, run `python worker.py` instead.
 
-The configurator saves settings to `CONFIG/config.json`. Use its numbered menu to select the interface, add or remove processes, toggle automatic start or stop-on-disconnect, and save. Choose **Exit without saving** to discard the current changes. Options can be toggled repeatedly without answering extra confirmation prompts.
+The configurator saves settings to `CONFIG/config.json` when you click **Save**. Click **Close without saving** to discard changes. It uses Python's built-in Tkinter GUI toolkit and does not require additional dependencies.
 
 ## Configuration Format
 

@@ -1,36 +1,12 @@
 import json
 import os
+import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
 
 import psutil
 
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), "CONFIG")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
-
-
-def clear_console():
-    os.system("cls" if os.name == "nt" else "clear")
-
-
-def list_and_select_interface():
-    interfaces = list(psutil.net_if_stats())
-    if not interfaces:
-        print("No network interfaces are available.")
-        return None
-
-    print("\nAvailable network interfaces:")
-    for idx, interface in enumerate(interfaces, 1):
-        print(f"  {idx}. {interface}")
-
-    while True:
-        try:
-            choice = int(input("Select an interface number (0 to cancel): "))
-            if choice == 0:
-                return None
-            if 1 <= choice <= len(interfaces):
-                return interfaces[choice - 1]
-        except ValueError:
-            pass
-        print("Invalid choice. Try again.")
 
 
 def get_sorted_active_processes():
@@ -55,84 +31,14 @@ def process_key(process_path):
     return os.path.basename(expanded_path).casefold()
 
 
-def add_processes(process_list):
-    source = input(
-        "\nAdd process: [1] enter executable path, [2] choose a running process, [0] cancel: "
-    ).strip()
-
-    if source == "1":
-        while True:
-            process_path = input("Enter the full path to an .exe (blank to cancel): ").strip().strip('"')
-            if not process_path:
-                return
-            expanded_path = os.path.expandvars(os.path.expanduser(process_path))
-            if not os.path.isabs(expanded_path):
-                print("Enter an absolute path.")
-                continue
-            if not expanded_path.lower().endswith(".exe") or not os.path.isfile(expanded_path):
-                print("Executable not found. Check the path and try again.")
-                continue
-            candidates = [os.path.abspath(expanded_path)]
-            break
-    elif source == "2":
-        active_processes = get_sorted_active_processes()
-        if not active_processes:
-            print("No running processes are available.")
-            return
-        print("\nProcesses currently running:")
-        for idx, (name, path) in enumerate(active_processes, 1):
-            print(f"  {idx}. {name} - {path or 'path unavailable'}")
-        selections = input("Enter process numbers separated by spaces (blank to cancel): ").split()
-        try:
-            indices = [int(selection) for selection in selections]
-        except ValueError:
-            print("Invalid selection. No processes were added.")
-            return
-        candidates = []
-        for index in indices:
-            if 1 <= index <= len(active_processes):
-                name, path = active_processes[index - 1]
-                candidates.append(path or name)
-            else:
-                print(f"Process number {index} is invalid and was skipped.")
-    elif source == "0":
-        return
-    else:
-        print("Invalid choice.")
-        return
-
+def add_processes(process_list, candidates):
     existing = {process_key(process) for process in process_list}
     for candidate in candidates:
         key = process_key(candidate)
         if key in existing:
-            print(f"'{candidate}' is already configured.")
             continue
         process_list.append(candidate)
         existing.add(key)
-        print(f"Added '{candidate}'.")
-
-
-def remove_process(process_list):
-    if not process_list:
-        print("No configured processes to remove.")
-        return
-
-    print("\nConfigured processes:")
-    for idx, process in enumerate(process_list, 1):
-        print(f"  {idx}. {process}")
-
-    try:
-        choice = int(input("Select a process number to remove (0 to cancel): "))
-    except ValueError:
-        print("Invalid choice.")
-        return
-    if choice == 0:
-        return
-    if 1 <= choice <= len(process_list):
-        removed = process_list.pop(choice - 1)
-        print(f"Removed '{removed}'.")
-    else:
-        print("Invalid process number.")
 
 
 def load_configuration():
@@ -148,15 +54,12 @@ def load_configuration():
         with open(CONFIG_FILE, "r", encoding="utf-8") as config_file:
             configuration = json.load(config_file)
     except (OSError, json.JSONDecodeError) as error:
-        print(f"Could not read configuration: {error}")
-        return None
+        raise ValueError(f"Could not read configuration: {error}") from error
 
     if not isinstance(configuration, dict):
-        print("Invalid configuration: expected a JSON object.")
-        return None
+        raise ValueError("Invalid configuration: expected a JSON object.")
     if not isinstance(configuration.get("processes", []), list):
-        print("Invalid configuration: 'processes' must be a list.")
-        return None
+        raise ValueError("Invalid configuration: 'processes' must be a list.")
 
     configuration.setdefault("interface", "")
     configuration.setdefault("processes", [])
@@ -170,58 +73,167 @@ def load_configuration():
 def save_configuration(configuration):
     with open(CONFIG_FILE, "w", encoding="utf-8") as config_file:
         json.dump(configuration, config_file, indent=4)
-    print(f"Configuration saved to: {CONFIG_FILE}")
-
-
 def main():
     os.makedirs(CONFIG_DIR, exist_ok=True)
-    configuration = load_configuration()
-    if configuration is None:
+
+    root = tk.Tk()
+    root.title("VPN Checker - Configuration")
+    root.minsize(620, 460)
+    root.columnconfigure(0, weight=1)
+    root.rowconfigure(1, weight=1)
+
+    try:
+        configuration = load_configuration()
+    except ValueError as error:
+        messagebox.showerror("Configuration error", str(error), parent=root)
+        root.destroy()
         return
 
-    while True:
-        clear_console()
-        print("\n=== VPN Checker Configuration ===")
-        print(f"Interface: {configuration['interface'] or '(not selected)'}")
-        if configuration["processes"]:
-            for idx, process in enumerate(configuration["processes"], 1):
-                print(f"  {idx}. {process}")
-        else:
-            print("Processes: (none)")
-        print(f"Automatic start: {'on' if configuration['auto_start_processes'] else 'off'}")
-        print(f"Stop on disconnect: {'on' if configuration['stop_processes_on_disconnect'] else 'off'}")
-        print(
-            "\n[1] Select interface  [2] Add process  [3] Remove process\n"
-            "[4] Toggle automatic start  [5] Toggle stop on disconnect\n"
-            "[6] Save and exit  [0] Exit without saving"
+    interfaces = list(psutil.net_if_stats())
+    current_interface = configuration["interface"]
+    if current_interface and current_interface not in interfaces:
+        interfaces.insert(0, current_interface)
+
+    interface_var = tk.StringVar(value=current_interface)
+    auto_start_var = tk.BooleanVar(value=configuration["auto_start_processes"])
+    stop_disconnect_var = tk.BooleanVar(value=configuration["stop_processes_on_disconnect"])
+
+    interface_frame = ttk.LabelFrame(root, text="Network interface", padding=10)
+    interface_frame.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
+    interface_frame.columnconfigure(0, weight=1)
+    interface_combo = ttk.Combobox(
+        interface_frame,
+        textvariable=interface_var,
+        values=interfaces,
+        state="readonly",
+    )
+    interface_combo.grid(row=0, column=0, sticky="ew")
+
+    process_frame = ttk.LabelFrame(root, text="Configured processes", padding=10)
+    process_frame.grid(row=1, column=0, sticky="nsew", padx=12, pady=6)
+    process_frame.columnconfigure(0, weight=1)
+    process_frame.rowconfigure(0, weight=1)
+    process_listbox = tk.Listbox(process_frame, selectmode=tk.EXTENDED, height=10)
+    process_listbox.grid(row=0, column=0, sticky="nsew")
+    process_scrollbar = ttk.Scrollbar(process_frame, orient="vertical", command=process_listbox.yview)
+    process_scrollbar.grid(row=0, column=1, sticky="ns")
+    process_listbox.configure(yscrollcommand=process_scrollbar.set)
+
+    def refresh_process_list():
+        process_listbox.delete(0, tk.END)
+        for process in configuration["processes"]:
+            process_listbox.insert(tk.END, process)
+
+    def add_selected_processes(candidates):
+        add_processes(configuration["processes"], candidates)
+        refresh_process_list()
+
+    def add_from_file():
+        path = filedialog.askopenfilename(
+            title="Select an application",
+            filetypes=[("Executable files", "*.exe")],
+        )
+        if path:
+            if not path.lower().endswith(".exe"):
+                messagebox.showerror("Invalid file", "Select a Windows .exe file.", parent=root)
+                return
+            add_selected_processes([os.path.abspath(path)])
+
+    def add_running_process():
+        running_processes = get_sorted_active_processes()
+        if not running_processes:
+            messagebox.showinfo("Running processes", "No running processes are available.", parent=root)
+            return
+
+        dialog = tk.Toplevel(root)
+        dialog.title("Select running processes")
+        dialog.minsize(550, 350)
+        dialog.transient(root)
+        dialog.grab_set()
+        dialog.columnconfigure(0, weight=1)
+        dialog.rowconfigure(0, weight=1)
+
+        running_list = tk.Listbox(dialog, selectmode=tk.EXTENDED)
+        running_list.grid(row=0, column=0, sticky="nsew", padx=(12, 0), pady=12)
+        running_scrollbar = ttk.Scrollbar(dialog, orient="vertical", command=running_list.yview)
+        running_scrollbar.grid(row=0, column=1, sticky="ns", padx=(0, 12), pady=12)
+        running_list.configure(yscrollcommand=running_scrollbar.set)
+
+        for name, path in running_processes:
+            running_list.insert(tk.END, f"{name} - {path or 'path unavailable'}")
+
+        def confirm_running_selection():
+            selected = [running_processes[index][1] or running_processes[index][0]
+                        for index in running_list.curselection()]
+            add_selected_processes(selected)
+            dialog.destroy()
+
+        dialog_buttons = ttk.Frame(dialog, padding=(12, 0, 12, 12))
+        dialog_buttons.grid(row=1, column=0, columnspan=2, sticky="e")
+        ttk.Button(dialog_buttons, text="Cancel", command=dialog.destroy).pack(side="right")
+        ttk.Button(dialog_buttons, text="Add selected", command=confirm_running_selection).pack(
+            side="right", padx=(0, 8)
         )
 
-        choice = input("Choose an action: ").strip()
-        if choice == "1":
-            interface = list_and_select_interface()
-            if interface is not None:
-                configuration["interface"] = interface
-        elif choice == "2":
-            add_processes(configuration["processes"])
-        elif choice == "3":
-            remove_process(configuration["processes"])
-        elif choice == "4":
-            configuration["auto_start_processes"] = not configuration["auto_start_processes"]
-        elif choice == "5":
-            configuration["stop_processes_on_disconnect"] = not configuration["stop_processes_on_disconnect"]
-        elif choice == "6":
-            if not configuration["interface"]:
-                print("Select a network interface before saving.")
-                continue
+    def remove_selected_processes():
+        selected = process_listbox.curselection()
+        if not selected:
+            messagebox.showinfo("Remove process", "Select one or more processes first.", parent=root)
+            return
+        for index in reversed(selected):
+            del configuration["processes"][index]
+        refresh_process_list()
+
+    options_frame = ttk.LabelFrame(root, text="Automation", padding=10)
+    options_frame.grid(row=2, column=0, sticky="ew", padx=12, pady=6)
+    ttk.Checkbutton(
+        options_frame,
+        text="Start configured processes automatically when the interface is connected",
+        variable=auto_start_var,
+    ).pack(anchor="w")
+    ttk.Checkbutton(
+        options_frame,
+        text="Stop configured processes when the interface disconnects",
+        variable=stop_disconnect_var,
+    ).pack(anchor="w", pady=(6, 0))
+
+    process_buttons = ttk.Frame(process_frame)
+    process_buttons.grid(row=1, column=0, columnspan=2, sticky="w", pady=(10, 0))
+    ttk.Button(process_buttons, text="Add executable...", command=add_from_file).pack(side="left")
+    ttk.Button(process_buttons, text="Choose running process...", command=add_running_process).pack(
+        side="left", padx=6
+    )
+    ttk.Button(process_buttons, text="Remove selected", command=remove_selected_processes).pack(side="left")
+
+    def save_and_close():
+        selected_interface = interface_var.get()
+        if not selected_interface:
+            messagebox.showerror("Missing interface", "Select a network interface before saving.", parent=root)
+            return
+        if not messagebox.askyesno(
+            "Confirm changes",
+            "Apply these settings and save the configuration?",
+            parent=root,
+        ):
+            return
+        configuration["interface"] = selected_interface
+        configuration["auto_start_processes"] = auto_start_var.get()
+        configuration["stop_processes_on_disconnect"] = stop_disconnect_var.get()
+        try:
             save_configuration(configuration)
+        except OSError as error:
+            messagebox.showerror("Save error", f"Could not save configuration: {error}", parent=root)
             return
-        elif choice == "0":
-            print("No changes saved.")
-            return
-        else:
-            print("Invalid choice.")
+        root.destroy()
+
+    footer = ttk.Frame(root, padding=12)
+    footer.grid(row=3, column=0, sticky="ew")
+    ttk.Button(footer, text="Close without saving", command=root.destroy).pack(side="right")
+    ttk.Button(footer, text="Save", command=save_and_close).pack(side="right", padx=(0, 8))
+
+    refresh_process_list()
+    root.mainloop()
 
 
 if __name__ == "__main__":
     main()
-    input("Press ENTER to close...")
