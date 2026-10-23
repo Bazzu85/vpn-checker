@@ -7,7 +7,7 @@ A small Windows utility that monitors a selected network interface and starts co
 - Select a network interface from those available on the system.
 - Add applications by entering an executable path or selecting from currently running processes.
 - Remove configured applications and update the configuration interactively.
-- Check the selected interface every 10 seconds and start missing applications.
+- Check the selected interface every 10 seconds, with optional automatic process start and stop.
 
 ## Requirements
 
@@ -51,14 +51,16 @@ The configurator saves settings to `CONFIG/config.json`. When this file already 
 
 ## Configuration Format
 
-The configuration file contains the selected interface name and a list of executable paths or process names:
+The configuration file contains the selected interface name, a list of executable paths or process names, and two optional automation settings:
 
 ```json
 {
   "interface": "Your VPN interface name",
   "processes": [
     "C:\\Program Files\\Example App\\example.exe"
-  ]
+  ],
+  "auto_start_processes": false,
+  "stop_processes_on_disconnect": false
 }
 ```
 
@@ -66,6 +68,6 @@ Use JSON-escaped backslashes in Windows paths, as shown above.
 
 ## Important Behavior
 
-The worker starts a configured application only when the selected interface is reported as up and the application is not already running. It retries the check every 10 seconds. If the interface is down or missing, it stops all running instances of the configured applications during that check.
+Both automation options are disabled by default, including for existing configuration files that do not yet contain these settings. When **automatic process start** is enabled, the worker starts configured applications that are not already running while the selected interface is up. When **stop processes on disconnect** is enabled, it stops all running instances of configured applications if the selected interface is down or missing. The worker checks the interface every 10 seconds.
 
 This tool does not route application traffic through a VPN or verify that the VPN can reach the internet. Configure VPN routing and any required network protections separately.

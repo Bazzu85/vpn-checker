@@ -47,6 +47,17 @@ def process_key(process_path):
     expanded_path = os.path.expandvars(os.path.expanduser(process_path.strip().strip('"')))
     return os.path.basename(expanded_path).casefold()
 
+def configure_automation_options(configuration):
+    auto_start = configuration.get("auto_start_processes") is True
+    stop_on_disconnect = configuration.get("stop_processes_on_disconnect") is True
+
+    configuration["auto_start_processes"] = ask_yes_no(
+        f"Enable automatic process start when the interface is connected? (currently {'enabled' if auto_start else 'disabled'})"
+    )
+    configuration["stop_processes_on_disconnect"] = ask_yes_no(
+        f"Stop configured processes when the interface disconnects? (currently {'enabled' if stop_on_disconnect else 'disabled'})"
+    )
+
 def manage_process_additions(process_list):
     manual_entry = ask_yes_no("Do you want to enter Windows processes manually?")
     if manual_entry:
@@ -108,9 +119,13 @@ def main():
         
         configuration = {
             "interface": interface_name,
-            "processes": processes
+            "processes": processes,
+            "auto_start_processes": False,
+            "stop_processes_on_disconnect": False
         }
-        
+
+        configure_automation_options(configuration)
+
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(configuration, f, indent=4)
         print(f"\nConfiguration created and saved successfully to: {CONFIG_FILE}")
@@ -168,6 +183,7 @@ def main():
                 break
                 
         configuration['processes'] = processes
+        configure_automation_options(configuration)
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(configuration, f, indent=4)
         print(f"\nConfiguration updated and saved to: {CONFIG_FILE}")

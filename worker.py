@@ -86,28 +86,32 @@ def monitor(stop_event):
             
         interface_name = configuration.get("interface")
         processes = configuration.get("processes", [])
+        auto_start_processes = configuration.get("auto_start_processes") is True
+        stop_processes_on_disconnect = configuration.get("stop_processes_on_disconnect") is True
         
         # Check whether the network interface exists and is up.
         network_stats = psutil.net_if_stats()
         if interface_name in network_stats and network_stats[interface_name].isup:
-            # Compare active process names case-insensitively.
-            active_processes = {p.info['name'].lower() for p in psutil.process_iter(['name']) if p.info['name']}
-            
-            for process_path in processes:
-                process_name = os.path.basename(process_path).lower()
-                if process_name not in active_processes:
-                    print(f"[WARNING] Process '{process_path}' is not running. Starting it...")
-                    executable_path = resolve_executable_path(process_path)
-                    if not executable_path:
-                        print(f"[ERROR] Executable '{process_path}' not found. Enter the full path to the .exe file in the configurator.")
-                        continue
-                    try:
-                        subprocess.Popen([executable_path])
-                    except Exception as error:
-                        print(f"Error starting process '{process_path}': {error}")
+            if auto_start_processes:
+                # Compare active process names case-insensitively.
+                active_processes = {p.info['name'].lower() for p in psutil.process_iter(['name']) if p.info['name']}
+
+                for process_path in processes:
+                    process_name = os.path.basename(process_path).lower()
+                    if process_name not in active_processes:
+                        print(f"[WARNING] Process '{process_path}' is not running. Starting it...")
+                        executable_path = resolve_executable_path(process_path)
+                        if not executable_path:
+                            print(f"[ERROR] Executable '{process_path}' not found. Enter the full path to the .exe file in the configurator.")
+                            continue
+                        try:
+                            subprocess.Popen([executable_path])
+                        except Exception as error:
+                            print(f"Error starting process '{process_path}': {error}")
         else:
             print(f"Network interface '{interface_name}' is disconnected or not found.")
-            stop_configured_processes(processes)
+            if stop_processes_on_disconnect:
+                stop_configured_processes(processes)
             
         stop_event.wait(10)
 
