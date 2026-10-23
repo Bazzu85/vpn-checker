@@ -5,173 +5,173 @@ import psutil
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), "CONFIG")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 
-def chiedi_si_no(messaggio):
-    """Chiede all'utente un input S/N ripetendo la domanda in caso di errore."""
+def ask_yes_no(message):
+    """Prompt for a yes/no answer, repeating the question if the input is invalid."""
     while True:
-        risposta = input(f"{messaggio} (s/n): ").strip().lower()
-        if risposta in ('s', 'si', 'sì', 'y', 'yes'):
+        response = input(f"{message} (y/n): ").strip().lower()
+        if response in ('y', 'yes'):
             return True
-        elif risposta in ('n', 'no'):
+        elif response in ('n', 'no'):
             return False
-        print("Valore non valido. Inserire 's' per sì o 'n' per no.")
+        print("Invalid input. Enter 'y' for yes or 'n' for no.")
 
-def elenca_e_scegli_interfaccia():
-    interfacce = list(psutil.net_if_stats().keys())
-    print("\nInterfacce di rete disponibili:")
-    for idx, iface in enumerate(interfacce, 1):
+def list_and_select_interface():
+    interfaces = list(psutil.net_if_stats().keys())
+    print("\nAvailable network interfaces:")
+    for idx, iface in enumerate(interfaces, 1):
         print(f"  {idx}. {iface}")
     
     while True:
         try:
-            scelta = int(input("Scegli il numero dell'interfaccia da configurare: "))
-            if 1 <= scelta <= len(interfacce):
-                return interfacce[scelta - 1]
+            choice = int(input("Enter the number of the interface to configure: "))
+            if 1 <= choice <= len(interfaces):
+                return interfaces[choice - 1]
         except ValueError:
             pass
-        print("Scelta non valida. Riprova.")
+        print("Invalid choice. Try again.")
 
-def ottieni_processi_attivi_ordinati():
-    procs = {}
+def get_sorted_active_processes():
+    processes_by_path = {}
     for p in psutil.process_iter(['name', 'exe']):
         try:
-            nome = p.info.get('name')
-            percorso = p.info.get('exe')
+            name = p.info.get('name')
+            path = p.info.get('exe')
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             continue
-        if nome:
-            chiave = percorso.casefold() if percorso else nome.casefold()
-            procs.setdefault(chiave, (nome, percorso))
-    return sorted(procs.values(), key=lambda proc: (proc[0].lower(), (proc[1] or '').lower()))
+        if name:
+            key = path.casefold() if path else name.casefold()
+            processes_by_path.setdefault(key, (name, path))
+    return sorted(processes_by_path.values(), key=lambda process: (process[0].lower(), (process[1] or '').lower()))
 
-def chiave_processo(proc):
-    percorso = os.path.expandvars(os.path.expanduser(proc.strip().strip('"')))
-    return os.path.basename(percorso).casefold()
+def process_key(process_path):
+    expanded_path = os.path.expandvars(os.path.expanduser(process_path.strip().strip('"')))
+    return os.path.basename(expanded_path).casefold()
 
-def gestisci_aggiunta_processi(lista_processi):
-    manuale = chiedi_si_no("Vuoi inserire a mano i processi windows da aggiungere?")
-    if manuale:
+def manage_process_additions(process_list):
+    manual_entry = ask_yes_no("Do you want to enter Windows processes manually?")
+    if manual_entry:
         while True:
             while True:
-                proc = input("Inserisci il percorso completo del file .exe (es. C:\\Program Files\\app\\app.exe): ").strip().strip('"')
-                percorso = os.path.expandvars(os.path.expanduser(proc))
-                if not os.path.isabs(percorso):
-                    print("Percorso non completo: inserisci un percorso assoluto, ad esempio C:\\Program Files\\app\\app.exe.")
+                process_path = input("Enter the full path to the .exe file (e.g. C:\\Program Files\\app\\app.exe): ").strip().strip('"')
+                expanded_path = os.path.expandvars(os.path.expanduser(process_path))
+                if not os.path.isabs(expanded_path):
+                    print("Incomplete path: enter an absolute path, for example C:\\Program Files\\app\\app.exe.")
                     continue
-                if not percorso.lower().endswith('.exe') or not os.path.isfile(percorso):
-                    print("File .exe non trovato: controlla il percorso in Esplora file e inseriscilo di nuovo.")
+                if not expanded_path.lower().endswith('.exe') or not os.path.isfile(expanded_path):
+                    print(".exe file not found. Check the path in File Explorer and enter it again.")
                     continue
-                proc = os.path.abspath(percorso)
+                process_path = os.path.abspath(expanded_path)
                 break
 
-            if not any(chiave_processo(esistente) == chiave_processo(proc) for esistente in lista_processi):
-                lista_processi.append(proc)
-                print(f"Processo '{proc}' aggiunto.")
+            if not any(process_key(existing) == process_key(process_path) for existing in process_list):
+                process_list.append(process_path)
+                print(f"Process '{process_path}' added.")
             else:
-                print("Il processo è già presente nella configurazione.")
+                print("This process is already in the configuration.")
             
-            if not chiedi_si_no("Vuoi inserire un altro processo?"):
+            if not ask_yes_no("Do you want to add another process?"):
                 break
     else:
-        attivi = ottieni_processi_attivi_ordinati()
-        print("\nProcessi attivi sul sistema:")
-        for idx, (nome, percorso) in enumerate(attivi, 1):
-            dettaglio = percorso or "percorso non disponibile"
-            print(f"  {idx}. {nome} - {dettaglio}")
+        active_processes = get_sorted_active_processes()
+        print("\nProcesses currently running:")
+        for idx, (name, path) in enumerate(active_processes, 1):
+            details = path or "path unavailable"
+            print(f"  {idx}. {name} - {details}")
             
-        scelte = input("Inserisci i numeri dei processi da aggiungere separati da spazio (es. 1 3 5): ").strip()
+        selections = input("Enter the numbers of the processes to add, separated by spaces (e.g. 1 3 5): ").strip()
         try:
-            indici = [int(x) for x in scelte.split()]
-            for idx in indici:
-                if 1 <= idx <= len(attivi):
-                    nome_proc, percorso = attivi[idx - 1]
-                    valore_configurazione = percorso or nome_proc
-                    if not any(chiave_processo(esistente) == chiave_processo(valore_configurazione) for esistente in lista_processi):
-                        lista_processi.append(valore_configurazione)
-                        print(f"Processo '{valore_configurazione}' aggiunto.")
+            indices = [int(value) for value in selections.split()]
+            for idx in indices:
+                if 1 <= idx <= len(active_processes):
+                    process_name, process_path = active_processes[idx - 1]
+                    config_value = process_path or process_name
+                    if not any(process_key(existing) == process_key(config_value) for existing in process_list):
+                        process_list.append(config_value)
+                        print(f"Process '{config_value}' added.")
                     else:
-                        print(f"Processo '{nome_proc}' già presente nella configurazione.")
+                        print(f"Process '{process_name}' is already in the configuration.")
                 else:
-                    print(f"Indice {idx} non valido, saltato.")
+                    print(f"Index {idx} is invalid and was skipped.")
         except ValueError:
-            print("Formato non valido. Nessun processo aggiunto.")
+            print("Invalid format. No processes were added.")
 
 def main():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     
-    # Controllo se il file di configurazione esiste
+    # Check whether the configuration file exists.
     if not os.path.exists(CONFIG_FILE):
-        print("=== CONFIGURATORE: Nuova Configurazione ===")
-        interfaccia = elenca_e_scegli_interfaccia()
-        processi = []
+        print("=== CONFIGURATOR: New Configuration ===")
+        interface_name = list_and_select_interface()
+        processes = []
         
-        gestisci_aggiunta_processi(processi)
+        manage_process_additions(processes)
         
-        config = {
-            "interface": interfaccia,
-            "processes": processi
+        configuration = {
+            "interface": interface_name,
+            "processes": processes
         }
         
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=4)
-        print(f"\nConfigurazione creata e salvata con successo in: {CONFIG_FILE}")
+            json.dump(configuration, f, indent=4)
+        print(f"\nConfiguration created and saved successfully to: {CONFIG_FILE}")
         
     else:
-        print("=== CONFIGURATORE: Modifica Configurazione Esistente ===")
+        print("=== CONFIGURATOR: Edit Existing Configuration ===")
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                config = json.load(f)
+                configuration = json.load(f)
         except Exception:
-            config = {"interface": "", "processes": []}
+            configuration = {"interface": "", "processes": []}
             
-        print(f"Interfaccia di rete attuale: {config.get('interface', 'Nessuna')}")
+        print(f"Current network interface: {configuration.get('interface', 'None')}")
         
-        if chiedi_si_no("Vuoi cambiare l'interfaccia di rete?"):
-            config['interface'] = elenca_e_scegli_interfaccia()
+        if ask_yes_no("Do you want to change the network interface?"):
+            configuration['interface'] = list_and_select_interface()
             
-        processi = config.get('processes', [])
+        processes = configuration.get('processes', [])
         
-        # Loop di gestione processi (aggiunta e rimozione)
+        # Process management loop (add and remove).
         while True:
-            print("\n--- Elenco attuale dei processi configurati ---")
-            if not processi:
-                print("  (Nessun processo configurato)")
+            print("\n--- Currently configured processes ---")
+            if not processes:
+                print("  (No processes configured)")
             else:
-                for idx, p in enumerate(processi, 1):
-                    print(f"  ID {idx}: {p}")
+                for idx, process in enumerate(processes, 1):
+                    print(f"  ID {idx}: {process}")
                     
-            if chiedi_si_no("Vuoi aggiungere un processo?"):
-                gestisci_aggiunta_processi(processi)
+            if ask_yes_no("Do you want to add a process?"):
+                manage_process_additions(processes)
                 continue
                 
-            if processi and chiedi_si_no("Vuoi rimuovere un processo?"):
-                while processi:
+            if processes and ask_yes_no("Do you want to remove a process?"):
+                while processes:
                     try:
-                        id_rem = int(input("Inserisci l'ID del processo da rimuovere: "))
-                        if 1 <= id_rem <= len(processi):
-                            rimosso = processi.pop(id_rem - 1)
-                            print(f"Processo '{rimosso}' rimosso con successo.")
+                        remove_id = int(input("Enter the ID of the process to remove: "))
+                        if 1 <= remove_id <= len(processes):
+                            removed_process = processes.pop(remove_id - 1)
+                            print(f"Process '{removed_process}' removed successfully.")
                         else:
-                            print("ID non valido.")
+                            print("Invalid ID.")
                             break
                     except ValueError:
-                        print("Inserisci un numero intero valido.")
+                        print("Enter a valid integer.")
                         break
 
-                    if not processi or not chiedi_si_no("Vuoi rimuovere un altro processo?"):
+                    if not processes or not ask_yes_no("Do you want to remove another process?"):
                         break
 
-                    print("\n--- Elenco aggiornato dei processi configurati ---")
-                    for idx, processo in enumerate(processi, 1):
-                        print(f"  ID {idx}: {processo}")
+                    print("\n--- Updated list of configured processes ---")
+                    for idx, process in enumerate(processes, 1):
+                        print(f"  ID {idx}: {process}")
                     
-            if not chiedi_si_no("Vuoi effettuare altre modifiche ai processi?"):
+            if not ask_yes_no("Do you want to make other process changes?"):
                 break
                 
-        config['processes'] = processi
+        configuration['processes'] = processes
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=4)
-        print(f"\nConfigurazione aggiornata e salvata in: {CONFIG_FILE}")
+            json.dump(configuration, f, indent=4)
+        print(f"\nConfiguration updated and saved to: {CONFIG_FILE}")
 
 if __name__ == "__main__":
     main()
-    input("Premi INVIO per chiudere...")
+    input("Press ENTER to close...")

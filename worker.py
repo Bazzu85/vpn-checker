@@ -5,69 +5,69 @@ import shutil
 import subprocess
 import psutil
 
-# Percorso della cartella CONFIG rispetto alla posizione dello script
+# Path to the CONFIG folder relative to this script.
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), "CONFIG")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 
-def carica_configurazione():
+def load_configuration():
     if not os.path.exists(CONFIG_FILE):
         return None
     try:
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception as e:
-        print(f"Errore nella lettura del file di configurazione: {e}")
+    except Exception as error:
+        print(f"Error reading the configuration file: {error}")
         return None
 
-def risolvi_percorso_eseguibile(proc):
-    percorso = os.path.expandvars(os.path.expanduser(proc.strip().strip('"')))
-    if os.path.isfile(percorso):
-        return os.path.abspath(percorso)
-    return shutil.which(percorso)
+def resolve_executable_path(process_path):
+    expanded_path = os.path.expandvars(os.path.expanduser(process_path.strip().strip('"')))
+    if os.path.isfile(expanded_path):
+        return os.path.abspath(expanded_path)
+    return shutil.which(expanded_path)
 
 def main():
-    print("=== WORKER AVVIATO ===")
-    print("Premi CTRL+C per interrompere lo script.\n")
+    print("=== WORKER STARTED ===")
+    print("Press CTRL+C to stop the script.\n")
     
     while True:
-        config = carica_configurazione()
+        configuration = load_configuration()
         
-        if not config:
-            print("File di configurazione non trovato nella cartella CONFIG. In attesa...")
+        if not configuration:
+            print("Configuration file not found in the CONFIG folder. Waiting...")
             time.sleep(5)
             continue
             
-        interfaccia = config.get("interface")
-        processi = config.get("processes", [])
+        interface_name = configuration.get("interface")
+        processes = configuration.get("processes", [])
         
-        # Verifica se l'interfaccia di rete esiste ed è attiva (isup)
-        stats_reti = psutil.net_if_stats()
-        if interfaccia in stats_reti and stats_reti[interfaccia].isup:
-            # Ottieni i nomi dei processi attualmente attivi (in minuscolo per un confronto robusto)
-            processi_attivi = {p.info['name'].lower() for p in psutil.process_iter(['name']) if p.info['name']}
+        # Check whether the network interface exists and is up.
+        network_stats = psutil.net_if_stats()
+        if interface_name in network_stats and network_stats[interface_name].isup:
+            # Compare active process names case-insensitively.
+            active_processes = {p.info['name'].lower() for p in psutil.process_iter(['name']) if p.info['name']}
             
-            for proc in processi:
-                nome_proc = os.path.basename(proc).lower()
-                if nome_proc not in processi_attivi:
-                    print(f"[ATTENZIONE] Processo '{proc}' non attivo. Avvio in corso...")
-                    percorso = risolvi_percorso_eseguibile(proc)
-                    if not percorso:
-                        print(f"[ERRORE] Eseguibile '{proc}' non trovato. Inserisci nel configuratore il percorso completo del file .exe.")
+            for process_path in processes:
+                process_name = os.path.basename(process_path).lower()
+                if process_name not in active_processes:
+                    print(f"[WARNING] Process '{process_path}' is not running. Starting it...")
+                    executable_path = resolve_executable_path(process_path)
+                    if not executable_path:
+                        print(f"[ERROR] Executable '{process_path}' not found. Enter the full path to the .exe file in the configurator.")
                         continue
                     try:
-                        subprocess.Popen([percorso])
-                    except Exception as e:
-                        print(f"Errore durante l'avvio del processo {proc}: {e}")
+                        subprocess.Popen([executable_path])
+                    except Exception as error:
+                        print(f"Error starting process '{process_path}': {error}")
         else:
-            print(f"Interfaccia di rete '{interfaccia}' non connessa o non trovata.")
+            print(f"Network interface '{interface_name}' is disconnected or not found.")
             
-        # Intervallo di controllo (es. ogni 10 secondi)
+        # Check every 10 seconds.
         time.sleep(10)
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\nWorker interrotto dall'utente.")
+        print("\nWorker stopped by user.")
     
-    input("Premi INVIO per chiudere...")
+    input("Press ENTER to close...")
