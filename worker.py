@@ -101,11 +101,20 @@ def create_tray_image():
 def hide_startup_console():
     if os.name != "nt":
         return
+    terminal_processes = {
+        "cmd.exe", "powershell.exe", "pwsh.exe", "windowsterminal.exe",
+        "code.exe", "openconsole.exe", "conhost.exe"
+    }
     try:
-        parent_name = psutil.Process(os.getppid()).name().lower()
+        for ancestor in psutil.Process().parents():
+            ancestor_name = ancestor.name().lower()
+            if ancestor_name == "explorer.exe":
+                break
+            if ancestor_name in terminal_processes:
+                return
+        else:
+            return
     except psutil.Error:
-        return
-    if parent_name != "explorer.exe":
         return
 
     import ctypes
