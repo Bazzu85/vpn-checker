@@ -47,7 +47,7 @@ python -m pip install -r requirements.txt
 
    The worker runs in the system tray only, with **Restart worker** and **Exit** options. Its output is written to `CONFIG/worker.log`. For console output while debugging, run `python worker.py` instead.
 
-The configurator saves settings to `CONFIG/config.json`. When this file already exists, running the configurator lets you edit the selected interface and process list.
+The configurator saves settings to `CONFIG/config.json`. Use its numbered menu to select the interface, add or remove processes, toggle automatic start or stop-on-disconnect, and save. Choose **Exit without saving** to discard the current changes. Options can be toggled repeatedly without answering extra confirmation prompts.
 
 ## Configuration Format
 
