@@ -66,6 +66,6 @@ Use JSON-escaped backslashes in Windows paths, as shown above.
 
 ## Important Behavior
 
-The worker starts a configured application only when the selected interface is reported as up and the application is not already running. It retries the check every 10 seconds. If the interface is down or missing, it does not start the applications during that check.
+The worker starts a configured application only when the selected interface is reported as up and the application is not already running. It retries the check every 10 seconds. If the interface is down or missing, it stops all running instances of the configured applications during that check.
 
-This tool does not route application traffic through a VPN, verify that the VPN can reach the internet, or stop applications when the interface disconnects. Configure VPN routing and any required network protections separately.
+This tool does not route application traffic through a VPN or verify that the VPN can reach the internet. Configure VPN routing and any required network protections separately.

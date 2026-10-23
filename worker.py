@@ -39,6 +39,42 @@ def resolve_executable_path(process_path):
         return os.path.abspath(expanded_path)
     return shutil.which(expanded_path)
 
+def stop_configured_processes(processes):
+    process_names = {os.path.basename(process_path).lower() for process_path in processes}
+    if not process_names:
+        return
+
+    matching_processes = []
+    for process in psutil.process_iter(['name']):
+        try:
+            process_name = process.info.get('name')
+        except psutil.NoSuchProcess:
+            continue
+        except psutil.Error as error:
+            print(f"[ERROR] Could not inspect a process while stopping configured applications: {error}")
+            continue
+
+        if process_name and process_name.lower() in process_names:
+            matching_processes.append(process)
+
+    for process in matching_processes:
+        try:
+            print(f"[INFO] Stopping process '{process.info.get('name')}'.")
+            process.terminate()
+        except psutil.NoSuchProcess:
+            continue
+        except psutil.Error as error:
+            print(f"[ERROR] Could not stop process with PID {process.pid}: {error}")
+
+    _, still_running = psutil.wait_procs(matching_processes, timeout=3)
+    for process in still_running:
+        try:
+            process.kill()
+        except psutil.NoSuchProcess:
+            continue
+        except psutil.Error as error:
+            print(f"[ERROR] Could not force-stop process with PID {process.pid}: {error}")
+
 def monitor(stop_event):
     while not stop_event.is_set():
         configuration = load_configuration()
@@ -71,6 +107,7 @@ def monitor(stop_event):
                         print(f"Error starting process '{process_path}': {error}")
         else:
             print(f"Network interface '{interface_name}' is disconnected or not found.")
+            stop_configured_processes(processes)
             
         stop_event.wait(10)
 
