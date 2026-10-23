@@ -76,6 +76,181 @@ def load_configuration():
 def save_configuration(configuration):
     with open(CONFIG_FILE, "w", encoding="utf-8") as config_file:
         json.dump(configuration, config_file, indent=4)
+
+
+def ask_yes_no(prompt, default):
+    default_text = "Y/n" if default else "y/N"
+    while True:
+        response = input(f"{prompt} ({default_text}): ").strip().lower()
+        if not response:
+            return default
+        if response in ("y", "yes"):
+            return True
+        if response in ("n", "no"):
+            return False
+        print("Invalid input. Enter 'y' or 'n'.")
+
+
+def select_console_interface(current_interface):
+    interfaces = list(psutil.net_if_stats())
+    if current_interface and current_interface not in interfaces:
+        interfaces.insert(0, current_interface)
+    if not interfaces:
+        print("No network interfaces are available.")
+        return ""
+
+    print("\nAvailable network interfaces:")
+    for index, interface in enumerate(interfaces, 1):
+        current_marker = " (current)" if interface == current_interface else ""
+        print(f"  {index}. {interface}{current_marker}")
+
+    while True:
+        default_hint = f" [Enter to keep {current_interface}]" if current_interface in interfaces else ""
+        selection = input(f"Select an interface number{default_hint}: ").strip()
+        if not selection and current_interface in interfaces:
+            return current_interface
+        try:
+            selected_index = int(selection)
+            if 1 <= selected_index <= len(interfaces):
+                return interfaces[selected_index - 1]
+        except ValueError:
+            pass
+        print("Invalid selection. Try again.")
+
+
+def add_process_from_console(process_list):
+    while True:
+        process_path = input("Enter the full path to an existing .exe file: ").strip().strip('"')
+        expanded_path = os.path.expandvars(os.path.expanduser(process_path))
+        if not os.path.isabs(expanded_path):
+            print("Enter an absolute path to the executable.")
+            continue
+        if not expanded_path.lower().endswith(".exe") or not os.path.isfile(expanded_path):
+            print("The .exe file was not found. Check the path and try again.")
+            continue
+
+        previous_count = len(process_list)
+        add_processes(process_list, [os.path.abspath(expanded_path)])
+        if len(process_list) > previous_count:
+            print(f"Added '{process_list[-1]}'.")
+        else:
+            print("This process is already configured.")
+        return
+
+
+def add_running_processes_from_console(process_list):
+    running_processes = get_sorted_active_processes()
+    if not running_processes:
+        print("No running processes are available.")
+        return
+
+    print("\nRunning processes:")
+    for index, (name, path) in enumerate(running_processes, 1):
+        print(f"  {index}. {name} - {path or 'path unavailable'}")
+
+    selection = input("Enter process numbers separated by spaces: ").strip()
+    try:
+        indices = [int(value) for value in selection.split()]
+    except ValueError:
+        print("Invalid format. No processes were added.")
+        return
+
+    candidates = [
+        running_processes[index - 1][1] or running_processes[index - 1][0]
+        for index in indices
+        if 1 <= index <= len(running_processes)
+    ]
+    previous_count = len(process_list)
+    add_processes(process_list, candidates)
+    print(f"Added {len(process_list) - previous_count} process(es).")
+
+
+def remove_processes_from_console(process_list):
+    while process_list:
+        print("\nConfigured processes:")
+        for index, process_path in enumerate(process_list, 1):
+            print(f"  {index}. {process_path}")
+
+        selection = input("Enter process numbers to remove, separated by spaces: ").strip()
+        try:
+            indices = sorted({int(value) for value in selection.split()}, reverse=True)
+        except ValueError:
+            print("Invalid format. Enter numeric process IDs.")
+            continue
+
+        valid_indices = [index for index in indices if 1 <= index <= len(process_list)]
+        if not valid_indices:
+            print("No valid process IDs were selected.")
+            continue
+
+        for index in valid_indices:
+            removed_process = process_list.pop(index - 1)
+            print(f"Removed '{removed_process}'.")
+        if not process_list or not ask_yes_no("Remove more processes?", False):
+            return
+
+
+def main_console():
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    try:
+        configuration = load_configuration()
+    except ValueError as error:
+        print(f"Configuration error: {error}")
+        return
+
+    print("=== VPN CHECKER CONFIGURATOR ===")
+    configuration["interface"] = select_console_interface(configuration["interface"])
+    if not configuration["interface"]:
+        return
+
+    while True:
+        print("\n--- Configuration ---")
+        print(f"Interface: {configuration['interface']}")
+        print(f"Processes: {len(configuration['processes'])}")
+        print(f"Automatic start: {'on' if configuration['auto_start_processes'] else 'off'}")
+        print(f"Stop on disconnect: {'on' if configuration['stop_processes_on_disconnect'] else 'off'}")
+        print(f"Debug logging: {'on' if configuration['debug'] else 'off'}")
+        print("1. Change network interface")
+        print("2. Add executable by path")
+        print("3. Add from running processes")
+        print("4. Remove configured processes")
+        print("5. Toggle automatic process start")
+        print("6. Toggle stop on disconnect")
+        print("7. Toggle debug logging")
+        print("8. Save configuration")
+        print("9. Save and exit")
+        print("0. Exit without saving")
+
+        choice = input("Select an action: ").strip()
+        if choice == "1":
+            configuration["interface"] = select_console_interface(configuration["interface"])
+        elif choice == "2":
+            add_process_from_console(configuration["processes"])
+        elif choice == "3":
+            add_running_processes_from_console(configuration["processes"])
+        elif choice == "4":
+            remove_processes_from_console(configuration["processes"])
+        elif choice == "5":
+            configuration["auto_start_processes"] = not configuration["auto_start_processes"]
+        elif choice == "6":
+            configuration["stop_processes_on_disconnect"] = not configuration["stop_processes_on_disconnect"]
+        elif choice == "7":
+            configuration["debug"] = not configuration["debug"]
+        elif choice in ("8", "9"):
+            try:
+                save_configuration(configuration)
+            except OSError as error:
+                print(f"Could not save configuration: {error}")
+                continue
+            print(f"Configuration saved to: {CONFIG_FILE}")
+            if choice == "9":
+                return
+        elif choice == "0":
+            return
+        else:
+            print("Invalid selection. Try again.")
+
+
 def main():
     os.makedirs(CONFIG_DIR, exist_ok=True)
 
@@ -240,4 +415,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main_console()
