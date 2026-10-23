@@ -14,11 +14,13 @@ A small Windows utility that monitors a selected network interface and starts co
 - Windows
 - Python 3
 - `psutil`
+- `pystray`
+- `Pillow`
 
-Install the dependency from PowerShell in the project folder:
+Install the dependencies from PowerShell in the project folder:
 
 ```powershell
-python -m pip install psutil
+python -m pip install -r requirements.txt
 ```
 
 ## Usage
@@ -37,13 +39,13 @@ python -m pip install psutil
 
    The active-process list displays executable paths when Windows makes them available. If a process path is unavailable, the configurator stores its process name instead.
 
-3. Start the worker in a separate PowerShell window:
+3. Start the worker:
 
    ```powershell
    python worker.py
    ```
 
-   Keep the worker running while you want it to monitor the interface. Press `Ctrl+C` to stop it, then press Enter if prompted.
+   The worker displays its startup messages, then hides the console when launched directly from File Explorer. Its tray icon provides **Restart worker** and **Exit** options. When launched from PowerShell or the VS Code terminal, the console stays visible because it is shared with the shell; press `Ctrl+C` there to stop the worker.
 
 The configurator saves settings to `CONFIG/config.json`. When this file already exists, running the configurator lets you edit the selected interface and process list.
 

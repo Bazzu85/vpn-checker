@@ -3,7 +3,11 @@ import json
 import time
 import shutil
 import subprocess
+import threading
+import sys
 import psutil
+import pystray
+from PIL import Image, ImageDraw
 
 # Path to the CONFIG folder relative to this script.
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), "CONFIG")
@@ -25,16 +29,13 @@ def resolve_executable_path(process_path):
         return os.path.abspath(expanded_path)
     return shutil.which(expanded_path)
 
-def main():
-    print("=== WORKER STARTED ===")
-    print("Press CTRL+C to stop the script.\n")
-    
-    while True:
+def monitor(stop_event):
+    while not stop_event.is_set():
         configuration = load_configuration()
         
         if not configuration:
             print("Configuration file not found in the CONFIG folder. Waiting...")
-            time.sleep(5)
+            stop_event.wait(5)
             continue
             
         interface_name = configuration.get("interface")
@@ -61,13 +62,80 @@ def main():
         else:
             print(f"Network interface '{interface_name}' is disconnected or not found.")
             
-        # Check every 10 seconds.
-        time.sleep(10)
+        stop_event.wait(10)
 
-if __name__ == "__main__":
+class WorkerController:
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._stop_event = threading.Event()
+        self._thread = None
+        self._start_thread()
+
+    def _start_thread(self):
+        self._stop_event = threading.Event()
+        self._thread = threading.Thread(target=monitor, args=(self._stop_event,), daemon=True)
+        self._thread.start()
+
+    def restart(self, icon=None, item=None):
+        with self._lock:
+            self._stop_event.set()
+            if self._thread and self._thread is not threading.current_thread():
+                self._thread.join()
+            self._start_thread()
+        print("[INFO] Worker restarted from the tray menu.")
+
+    def stop(self):
+        with self._lock:
+            self._stop_event.set()
+            thread = self._thread
+        if thread and thread is not threading.current_thread():
+            thread.join()
+
+def create_tray_image():
+    image = Image.new("RGB", (64, 64), (31, 41, 55))
+    draw = ImageDraw.Draw(image)
+    draw.polygon([(32, 5), (55, 14), (52, 37), (32, 59), (12, 37), (9, 14)], fill=(38, 145, 125))
+    draw.line([(20, 32), (28, 40), (44, 23)], fill=(255, 255, 255), width=5)
+    return image
+
+def hide_startup_console():
+    if os.name != "nt":
+        return
     try:
-        main()
+        parent_name = psutil.Process(os.getppid()).name().lower()
+    except psutil.Error:
+        return
+    if parent_name != "explorer.exe":
+        return
+
+    import ctypes
+    console_window = ctypes.windll.kernel32.GetConsoleWindow()
+    if console_window:
+        ctypes.windll.user32.ShowWindow(console_window, 0)
+
+def exit_worker(icon, item, controller):
+    controller.stop()
+    icon.stop()
+
+def main():
+    print("=== WORKER STARTED ===")
+    print("Use the tray icon to restart or exit the worker. Press CTRL+C to stop.\n")
+    sys.stdout.flush()
+    time.sleep(2)
+    hide_startup_console()
+
+    controller = WorkerController()
+    menu = pystray.Menu(
+        pystray.MenuItem("Restart worker", controller.restart),
+        pystray.MenuItem("Exit", lambda icon, item: exit_worker(icon, item, controller)),
+    )
+    icon = pystray.Icon("vpn_checker", create_tray_image(), "VPN Checker Worker", menu)
+    try:
+        icon.run()
     except KeyboardInterrupt:
         print("\nWorker stopped by user.")
-    
-    input("Press ENTER to close...")
+    finally:
+        controller.stop()
+
+if __name__ == "__main__":
+    main()
