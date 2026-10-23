@@ -39,13 +39,13 @@ python -m pip install -r requirements.txt
 
    The active-process list displays executable paths when Windows makes them available. If a process path is unavailable, the configurator stores its process name instead.
 
-3. Start the worker:
+3. Start the worker without a console window by double-clicking `worker.pyw` in File Explorer. You can also run it from PowerShell with `pythonw worker.py`:
 
    ```powershell
-   python worker.py
+   pythonw worker.py
    ```
 
-   The worker displays its startup messages, then hides the console when launched directly from File Explorer. Its tray icon provides **Restart worker** and **Exit** options. When launched from PowerShell or the VS Code terminal, the console stays visible because it is shared with the shell; press `Ctrl+C` there to stop the worker.
+   The worker runs in the system tray only, with **Restart worker** and **Exit** options. Its output is written to `CONFIG/worker.log`. For console output while debugging, run `python worker.py` instead.
 
 The configurator saves settings to `CONFIG/config.json`. When this file already exists, running the configurator lets you edit the selected interface and process list.
 

@@ -12,6 +12,16 @@ from PIL import Image, ImageDraw
 # Path to the CONFIG folder relative to this script.
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), "CONFIG")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
+LOG_FILE = os.path.join(CONFIG_DIR, "worker.log")
+
+def configure_output():
+    if sys.stdout is None or sys.stderr is None:
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        log_file = open(LOG_FILE, "a", encoding="utf-8", buffering=1)
+        sys.stdout = log_file
+        sys.stderr = log_file
+        return False
+    return True
 
 def load_configuration():
     if not os.path.exists(CONFIG_FILE):
@@ -127,11 +137,13 @@ def exit_worker(icon, item, controller):
     icon.stop()
 
 def main():
+    has_console = configure_output()
     print("=== WORKER STARTED ===")
     print("Use the tray icon to restart or exit the worker. Press CTRL+C to stop.\n")
-    sys.stdout.flush()
-    time.sleep(2)
-    hide_startup_console()
+    if has_console:
+        sys.stdout.flush()
+        time.sleep(2)
+        hide_startup_console()
 
     controller = WorkerController()
     menu = pystray.Menu(
