@@ -34,7 +34,7 @@ python -m pip install -r requirements.txt
 2. Select a network interface and add the applications to monitor. For manual entry, provide the full path to an existing `.exe` file, for example:
 
    ```text
-   C:\Program Files\qBittorrent\qbittorrent.exe
+   C:\Program Files\Example App\example.exe
    ```
 
    The active-process list displays executable paths when Windows makes them available. If a process path is unavailable, the configurator stores its process name instead.
