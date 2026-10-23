@@ -48,6 +48,7 @@ def load_configuration():
             "processes": [],
             "auto_start_processes": False,
             "stop_processes_on_disconnect": False,
+            "debug": False,
         }
 
     try:
@@ -65,8 +66,10 @@ def load_configuration():
     configuration.setdefault("processes", [])
     configuration.setdefault("auto_start_processes", False)
     configuration.setdefault("stop_processes_on_disconnect", False)
+    configuration.setdefault("debug", False)
     configuration["auto_start_processes"] = configuration["auto_start_processes"] is True
     configuration["stop_processes_on_disconnect"] = configuration["stop_processes_on_disconnect"] is True
+    configuration["debug"] = configuration["debug"] is True
     return configuration
 
 
@@ -97,6 +100,7 @@ def main():
     interface_var = tk.StringVar(value=current_interface)
     auto_start_var = tk.BooleanVar(value=configuration["auto_start_processes"])
     stop_disconnect_var = tk.BooleanVar(value=configuration["stop_processes_on_disconnect"])
+    debug_var = tk.BooleanVar(value=configuration["debug"])
 
     interface_frame = ttk.LabelFrame(root, text="Network interface", padding=10)
     interface_frame.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
@@ -184,7 +188,7 @@ def main():
             del configuration["processes"][index]
         refresh_process_list()
 
-    options_frame = ttk.LabelFrame(root, text="Automation", padding=10)
+    options_frame = ttk.LabelFrame(root, text="Automation and logging", padding=10)
     options_frame.grid(row=2, column=0, sticky="ew", padx=12, pady=6)
     ttk.Checkbutton(
         options_frame,
@@ -195,6 +199,11 @@ def main():
         options_frame,
         text="Stop configured processes when the interface disconnects",
         variable=stop_disconnect_var,
+    ).pack(anchor="w", pady=(6, 0))
+    ttk.Checkbutton(
+        options_frame,
+        text="Enable detailed worker debug logging",
+        variable=debug_var,
     ).pack(anchor="w", pady=(6, 0))
 
     process_buttons = ttk.Frame(process_frame)
@@ -210,15 +219,10 @@ def main():
         if not selected_interface:
             messagebox.showerror("Missing interface", "Select a network interface before saving.", parent=root)
             return
-        if not messagebox.askyesno(
-            "Confirm changes",
-            "Apply these settings and save the configuration?",
-            parent=root,
-        ):
-            return
         configuration["interface"] = selected_interface
         configuration["auto_start_processes"] = auto_start_var.get()
         configuration["stop_processes_on_disconnect"] = stop_disconnect_var.get()
+        configuration["debug"] = debug_var.get()
         try:
             save_configuration(configuration)
         except OSError as error:

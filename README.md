@@ -47,7 +47,7 @@ The configurator saves settings to `CONFIG/config.json` when you click **Save**.
 
 ## Configuration Format
 
-The configuration file contains the selected interface name, a list of executable paths or process names, and two optional automation settings:
+The configuration file contains the selected interface name, a list of executable paths or process names, and worker automation and logging settings:
 
 ```json
 {
@@ -56,7 +56,8 @@ The configuration file contains the selected interface name, a list of executabl
     "C:\\Program Files\\Example App\\example.exe"
   ],
   "auto_start_processes": false,
-  "stop_processes_on_disconnect": false
+   "stop_processes_on_disconnect": false,
+   "debug": false
 }
 ```
 
@@ -64,6 +65,6 @@ Use JSON-escaped backslashes in Windows paths, as shown above.
 
 ## Important Behavior
 
-Both automation options are disabled by default, including for existing configuration files that do not yet contain these settings. When **automatic process start** is enabled, the worker starts configured applications that are not already running while the selected interface is up. When **stop processes on disconnect** is enabled, it stops all running instances of configured applications if the selected interface is down or missing. The worker checks the interface every 10 seconds.
+Both automation options and debug logging are disabled by default, including for existing configuration files that do not yet contain these settings. When **automatic process start** is enabled, the worker starts configured applications that are not already running while the selected interface is up. When **stop processes on disconnect** is enabled, it stops all running instances of configured applications if the selected interface is down or missing. The worker checks the interface every 10 seconds. Enable **detailed worker debug logging** in the configurator to record each monitoring step with a `DEBUG` level; regular events use `INFO`, and warnings or errors retain their respective levels. Messages are written to `CONFIG/worker.log` and to standard output when a console is available.
 
 This tool does not route application traffic through a VPN or verify that the VPN can reach the internet. Configure VPN routing and any required network protections separately.
