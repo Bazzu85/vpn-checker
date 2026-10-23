@@ -224,42 +224,15 @@ def create_tray_image():
     draw.line([(20, 32), (28, 40), (44, 23)], fill=(255, 255, 255), width=5)
     return image
 
-def hide_startup_console():
-    if os.name != "nt":
-        return
-    terminal_processes = {
-        "cmd.exe", "powershell.exe", "pwsh.exe", "windowsterminal.exe",
-        "code.exe", "openconsole.exe", "conhost.exe"
-    }
-    try:
-        for ancestor in psutil.Process().parents():
-            ancestor_name = ancestor.name().lower()
-            if ancestor_name == "explorer.exe":
-                break
-            if ancestor_name in terminal_processes:
-                return
-        else:
-            return
-    except psutil.Error:
-        return
-
-    import ctypes
-    console_window = ctypes.windll.kernel32.GetConsoleWindow()
-    if console_window:
-        ctypes.windll.user32.ShowWindow(console_window, 0)
-
 def exit_worker(icon, item, controller):
     log_event("INFO", "Worker stopped from the tray menu.")
     controller.stop()
     icon.stop()
 
 def main():
-    has_console = configure_output()
+    configure_output()
     log_event("INFO", "Worker started.")
     log_event("INFO", "Use the tray icon to restart or exit the worker.")
-    if has_console:
-        time.sleep(2)
-        hide_startup_console()
 
     controller = WorkerController()
     menu = pystray.Menu(
